@@ -75,12 +75,14 @@ func NewAdmin(opts ...AdminOption) (Admin, error) {
 	for _, opt := range opts {
 		opt(defaultOpts)
 	}
-
-	cli := internal.GetOrNewRocketMQClient(defaultOpts.ClientOptions, nil)
 	namesrv, err := internal.NewNamesrv(defaultOpts.Resolver)
 	if err != nil {
 		return nil, err
 	}
+	defaultOpts.ClientOptions.Namesrv = namesrv
+
+	cli := internal.GetOrNewRocketMQClient(defaultOpts.ClientOptions, nil)
+
 	//log.Printf("Client: %#v", namesrv.srvs)
 	return &admin{
 		cli:     cli,
