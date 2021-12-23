@@ -19,6 +19,9 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
 	"sync"
 	"time"
 
@@ -33,7 +36,7 @@ type Admin interface {
 	DeleteTopic(ctx context.Context, opts ...OptionDelete) error
 	//TODO
 	//TopicList(ctx context.Context, mq *primitive.MessageQueue) (*remote.RemotingCommand, error)
-	//GetBrokerClusterInfo(ctx context.Context) (*remote.RemotingCommand, error)
+	GetBrokerClusterInfo(ctx context.Context, opts ...OptionInfo) (*internal.ClusterInfo, error)
 	Close() error
 }
 
@@ -67,6 +70,46 @@ type admin struct {
 	opts *adminOptions
 
 	closeOnce sync.Once
+}
+
+func (a *admin) GetBrokerClusterInfo(ctx context.Context, opts ...OptionInfo) (*internal.ClusterInfo, error) {
+	cfg := defaultClusterInfo()
+	for _, apply := range opts {
+		apply(&cfg)
+	}
+	cmd := remote.NewRemotingCommand(internal.ReqGetBrokerClusterInfo, nil, nil)
+	res, err := a.cli.InvokeSync(ctx, cfg.NameSrvAddr[0], cmd, cfg.TimeoutMillis)
+
+	if err != nil {
+		rlog.Error("connect to namesrv failed.", map[string]interface{}{
+			"namesrv": a,
+			"config":  cfg,
+		})
+		return nil, primitive.NewRemotingErr(err.Error())
+	}
+
+	v := &internal.ClusterInfo{}
+
+	switch res.Code {
+	case internal.ResSuccess:
+		if res.Body == nil {
+			return nil, primitive.NewMQClientErr(res.Code, res.Remark)
+		}
+		/**
+		todo 返回结果非json格式
+		 */
+		reg := regexp.MustCompile(`{(\d)`)
+		bodyStr := reg.ReplaceAllString(string(res.Body), `{"${1}"`)
+		json.Unmarshal([]byte(bodyStr), v)
+		if err != nil {
+			return nil, err
+		}
+		return v, nil
+	default:
+		return nil, primitive.NewMQClientErr(res.Code, res.Remark)
+	}
+
+	return v, err
 }
 
 // NewAdmin initialize admin
@@ -110,6 +153,22 @@ func (a *admin) CreateTopic(ctx context.Context, opts ...OptionCreate) error {
 		Order:           cfg.Order,
 	}
 
+	if cfg.BrokerAddr == "" {
+		clusterInfo, _ := a.GetBrokerClusterInfo(ctx, WithNameSrvAddrClusterInfo(cfg.NameSrvAddr))
+		fmt.Println(clusterInfo)
+		var address string
+		for _,v := range clusterInfo.BrokerAddrTable {
+			data, _ := interface{} (v).(internal.BrokerData)
+			for _,brokerAddr := range data.BrokerAddresses {
+				address = brokerAddr
+				break
+			}
+			fmt.Println("break inner")
+			break
+			fmt.Println("break outer")
+		}
+		cfg.BrokerAddr = address
+	}
 	cmd := remote.NewRemotingCommand(internal.ReqCreateTopic, request, nil)
 	_, err := a.cli.InvokeSync(ctx, cfg.BrokerAddr, cmd, 5*time.Second)
 	if err != nil {

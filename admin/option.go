@@ -17,6 +17,8 @@ limitations under the License.
 
 package admin
 
+import "time"
+
 func defaultTopicConfigCreate() TopicConfigCreate {
 	opts := TopicConfigCreate{
 		DefaultTopic:    "defaultTopic",
@@ -33,6 +35,7 @@ func defaultTopicConfigCreate() TopicConfigCreate {
 type TopicConfigCreate struct {
 	Topic           string
 	BrokerAddr      string
+	NameSrvAddr []string
 	DefaultTopic    string
 	ReadQueueNums   int
 	WriteQueueNums  int
@@ -92,6 +95,14 @@ func WithOrder(Order bool) OptionCreate {
 	}
 }
 
+func WithNameSrvAddrCreate(NameSrvAddr []string) OptionCreate {
+	return func(opts *TopicConfigCreate) {
+		opts.NameSrvAddr = NameSrvAddr
+	}
+}
+
+
+
 func defaultTopicConfigDelete() TopicConfigDelete {
 	opts := TopicConfigDelete{}
 	return opts
@@ -127,5 +138,33 @@ func WithClusterName(ClusterName string) OptionDelete {
 func WithNameSrvAddr(NameSrvAddr []string) OptionDelete {
 	return func(opts *TopicConfigDelete) {
 		opts.NameSrvAddr = NameSrvAddr
+	}
+}
+
+
+
+type ClusterInfoConf struct {
+	NameSrvAddr []string
+	TimeoutMillis time.Duration
+}
+
+func defaultClusterInfo() ClusterInfoConf {
+	opts := ClusterInfoConf{
+		TimeoutMillis: 5 * time.Second,
+	}
+	return opts
+}
+
+type OptionInfo func(*ClusterInfoConf)
+
+func WithNameSrvAddrClusterInfo(NameSrvAddr []string) OptionInfo {
+	return func(opts *ClusterInfoConf) {
+		opts.NameSrvAddr = NameSrvAddr
+	}
+}
+
+func WithTimeOutClusterInfo(timeout time.Duration) OptionInfo {
+	return func(opts *ClusterInfoConf) {
+		opts.TimeoutMillis = timeout
 	}
 }
