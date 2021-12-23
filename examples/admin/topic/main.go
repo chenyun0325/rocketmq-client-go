@@ -62,8 +62,9 @@ func main() {
 	err = testAdmin.CreateTopic(
 		context.Background(),
 		admin.WithTopicCreate(topic),
-		//admin.WithBrokerAddrCreate(brokerAddr),
+		admin.WithBrokerAddrCreate(brokerAddr),
 		admin.WithNameSrvAddrCreate(nameSrvAddr),
+		admin.WithClusterNameCreate("DefaultCluster"),
 	)
 	if err != nil {
 		fmt.Println("Create topic error:", err.Error())

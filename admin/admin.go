@@ -97,7 +97,7 @@ func (a *admin) GetBrokerClusterInfo(ctx context.Context, opts ...OptionInfo) (*
 		}
 		/**
 		todo 返回结果非json格式
-		 */
+		*/
 		reg := regexp.MustCompile(`{(\d)`)
 		bodyStr := reg.ReplaceAllString(string(res.Body), `{"${1}"`)
 		json.Unmarshal([]byte(bodyStr), v)
@@ -135,7 +135,6 @@ func NewAdmin(opts ...AdminOption) (Admin, error) {
 }
 
 // CreateTopic create topic.
-// TODO: another implementation like sarama, without brokerAddr as input
 func (a *admin) CreateTopic(ctx context.Context, opts ...OptionCreate) error {
 	cfg := defaultTopicConfigCreate()
 	for _, apply := range opts {
@@ -153,35 +152,39 @@ func (a *admin) CreateTopic(ctx context.Context, opts ...OptionCreate) error {
 		Order:           cfg.Order,
 	}
 
-	if cfg.BrokerAddr == "" {
+	var address []string
+	if cfg.BrokerAddr == "" || cfg.NameSrvAddr != nil {
 		clusterInfo, _ := a.GetBrokerClusterInfo(ctx, WithNameSrvAddrClusterInfo(cfg.NameSrvAddr))
 		fmt.Println(clusterInfo)
-		var address string
-		for _,v := range clusterInfo.BrokerAddrTable {
+		for _, v := range clusterInfo.BrokerAddrTable {
 			data, _ := interface{} (v).(internal.BrokerData)
-			for _,brokerAddr := range data.BrokerAddresses {
-				address = brokerAddr
-				break
+			if data.Cluster == cfg.ClusterName {
+				for bId, brokerAddr := range data.BrokerAddresses {
+					if bId == internal.MasterId {
+						address = append(address, brokerAddr)
+					}
+				}
 			}
-			fmt.Println("break inner")
-			break
-			fmt.Println("break outer")
 		}
-		cfg.BrokerAddr = address
-	}
-	cmd := remote.NewRemotingCommand(internal.ReqCreateTopic, request, nil)
-	_, err := a.cli.InvokeSync(ctx, cfg.BrokerAddr, cmd, 5*time.Second)
-	if err != nil {
-		rlog.Error("create topic error", map[string]interface{}{
-			rlog.LogKeyTopic:         cfg.Topic,
-			rlog.LogKeyBroker:        cfg.BrokerAddr,
-			rlog.LogKeyUnderlayError: err,
-		})
 	} else {
-		rlog.Info("create topic success", map[string]interface{}{
-			rlog.LogKeyTopic:  cfg.Topic,
-			rlog.LogKeyBroker: cfg.BrokerAddr,
-		})
+		address = append(address, cfg.BrokerAddr)
+	}
+	var err error
+	for _, addr := range address {
+		cmd := remote.NewRemotingCommand(internal.ReqCreateTopic, request, nil)
+		_, err = a.cli.InvokeSync(ctx, addr, cmd, 5*time.Second)
+		if err != nil {
+			rlog.Error("create topic error", map[string]interface{}{
+				rlog.LogKeyTopic:         cfg.Topic,
+				rlog.LogKeyBroker:        addr,
+				rlog.LogKeyUnderlayError: err,
+			})
+		} else {
+			rlog.Info("create topic success", map[string]interface{}{
+				rlog.LogKeyTopic:  cfg.Topic,
+				rlog.LogKeyBroker: addr,
+			})
+		}
 	}
 	return err
 }

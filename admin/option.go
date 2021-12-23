@@ -24,6 +24,7 @@ func defaultTopicConfigCreate() TopicConfigCreate {
 		DefaultTopic:    "defaultTopic",
 		ReadQueueNums:   8,
 		WriteQueueNums:  8,
+		ClusterName:     "DefaultCluster",
 		Perm:            6,
 		TopicFilterType: "SINGLE_TAG",
 		TopicSysFlag:    0,
@@ -35,7 +36,8 @@ func defaultTopicConfigCreate() TopicConfigCreate {
 type TopicConfigCreate struct {
 	Topic           string
 	BrokerAddr      string
-	NameSrvAddr []string
+	NameSrvAddr     []string
+	ClusterName     string
 	DefaultTopic    string
 	ReadQueueNums   int
 	WriteQueueNums  int
@@ -101,7 +103,11 @@ func WithNameSrvAddrCreate(NameSrvAddr []string) OptionCreate {
 	}
 }
 
-
+func WithClusterNameCreate(ClusterName string) OptionCreate {
+	return func(opts *TopicConfigCreate) {
+		opts.ClusterName = ClusterName
+	}
+}
 
 func defaultTopicConfigDelete() TopicConfigDelete {
 	opts := TopicConfigDelete{}
@@ -141,10 +147,8 @@ func WithNameSrvAddr(NameSrvAddr []string) OptionDelete {
 	}
 }
 
-
-
 type ClusterInfoConf struct {
-	NameSrvAddr []string
+	NameSrvAddr   []string
 	TimeoutMillis time.Duration
 }
 
